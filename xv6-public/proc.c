@@ -8,6 +8,9 @@
 #include "spinlock.h"
 
 struct {
+  int totalproc;
+  int qcnt[MLFQ_K + 1];
+  struct proc *runningproc[MLFQ_K];
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
@@ -24,6 +27,13 @@ void
 pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+
+  ptable.totalproc = 0;
+  for(int i = 0; i < MLFQ_K; i++) {
+    ptable.qcnt[i] = 0;
+    ptable.runningproc[i] = 0;
+  }
+  ptable.qcnt[MLFQ_K] = 0;
 }
 
 // Must be called with interrupts disabled
@@ -65,6 +75,21 @@ myproc(void) {
   return p;
 }
 
+struct proc*
+getproc(int pid) {
+  struct proc* p;
+  int foundpid = 0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid) {
+      foundpid = 1;
+      break;
+    }
+  }
+
+  if(!foundpid) return myproc();
+  return p;
+}
+
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
 // If found, change state to EMBRYO and initialize
@@ -86,8 +111,11 @@ allocproc(void)
   return 0;
 
 found:
+  ptable.qcnt[0]++;
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->qlevel = 0;
+  p->priority = 0;
 
   release(&ptable.lock);
 
@@ -252,7 +280,7 @@ exit(void)
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
-  // Pass abandoned children to init.
+  // Pass abandoned children to init. 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
@@ -295,6 +323,13 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+	
+	// update process count
+	ptable.qcnt[p->qlevel]--;
+	ptable.totalproc--;
+	p->qlevel = 0;
+        p->usedtq = 0;
+
         release(&ptable.lock);
         return pid;
       }
@@ -327,34 +362,25 @@ scheduler(void)
   struct cpu *c = mycpu();
   c->proc = 0;
  
-#ifndef SCHED_POLICY
-  cprintf("NOT DEFINED\n");
-#else
-  cprintf("DEFINED\n");
-#  if SCHED_POLICY==MULTILEVEL_SCHED
-  cprintf("MULTILEVEL_SCHED\n");
-#  elif SCHED_POLICY==MLFQ_SCHED
-  cprintf("MLFQ_SHCED\n");
-#  endif
-#endif
-
+// Multilevel scheduler
+#if SCHED_POLICY == MULTILEVEL_SCHED
+  cprintf("SCHED_POLICY == MULTILEVEL_SCHED\n");
+  int even_flag = 0;
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+    even_flag = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE) {
-        //if (p->pid != 0) cprintf("PASS    - p->pid: %d, p->state: %d\n", p->pid, p->state);
-	continue;
-      }
+      if(p->pid % 2 != 0 || p->state != RUNNABLE) continue;
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
 
-      //cprintf("NO PASS - p->pid: %d, p->state: %d\n", p->pid, p->state);
+      even_flag = 1;
 
       c->proc = p;
       switchuvm(p);
@@ -367,9 +393,122 @@ scheduler(void)
       // It should have changed its p->state before coming back.
       c->proc = 0;
     }
-    release(&ptable.lock);
 
+    if (even_flag != 0) {
+      release(&ptable.lock);
+      continue;
+    }
+
+    struct proc* minproc;
+    int foundmin = 0;
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid % 2 == 0 || p->state != RUNNABLE) continue;
+      if(!foundmin) {
+        minproc = p;
+	foundmin = 1;
+      }
+      if(p->pid < minproc->pid) minproc = p;
+    }
+
+    if (!foundmin) {
+      release(&ptable.lock);
+      continue;
+    }
+
+    c->proc = minproc;
+    switchuvm(minproc);
+    minproc->state = RUNNING;
+
+    swtch(&(c->scheduler), minproc->context);
+    switchkvm();
+
+    c->proc = 0;
+    release(&ptable.lock);
   }
+
+// MLFQ scheduler
+#elif SCHED_POLICY == MLFQ_SCHED
+  cprintf("SCHED_POLICY == MLFQ_SCHED\n");
+  for(;;){
+    sti();
+
+    acquire(&ptable.lock);
+    for(int i = 0; i < MLFQ_K; i++) {
+      int maxtq = i * 4 + 2;
+
+      // cprintf("%d queue: %d\n", i, ptable.qcnt[i]);
+      // if current level queue don't have any process continue
+      if (ptable.qcnt[i] == 0) continue;
+
+      // vip: selected process to run
+      struct proc *vip = 0;
+
+      // if current level queue has running process
+      if (ptable.runningproc[i] != 0 && ptable.runningproc[i]->state == RUNNABLE) {
+        
+	// if time quantum has overed
+        if(ptable.runningproc[i]->usedtq < maxtq) vip = ptable.runningproc[i];
+	else {
+	  ptable.qcnt[i]--;
+	  ptable.qcnt[i+1]++;
+          ptable.runningproc[i]->qlevel++;
+	  ptable.runningproc[i]->usedtq = 0;
+	  ptable.runningproc[i] = 0;
+	}
+      }
+
+      // if current level queue doesn't have running process
+      if(!vip) {
+        for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+          if(p->state != RUNNABLE || p->qlevel != i) continue;
+  	  if(!vip) {
+            vip = p;
+  	  }
+	  else if(vip->priority < p->priority) vip = p;
+        }
+      }
+
+      // if cannot find process to run, move to next queue
+      if(!vip) continue;
+
+      ptable.runningproc[i] = vip;
+      c->proc = vip;
+      switchuvm(vip);
+      vip->state = RUNNING;
+
+      swtch(&(c->scheduler), vip->context);
+      switchkvm();
+
+      c->proc = 0;
+      break;
+    }
+    release(&ptable.lock);
+  }
+
+// default scheduler (round robin)
+#else
+  cprintf("SCHED_POLICY == DEFAULT\n");
+  for(;;){
+
+    sti();
+
+    acquire(&ptable.lock); 
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE) continue;
+
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      c->proc = 0;
+    }
+    release(&ptable.lock);
+  }
+#endif
 }
 
 // Enter scheduler.  Must hold only ptable.lock

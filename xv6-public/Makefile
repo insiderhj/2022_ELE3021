@@ -81,9 +81,9 @@ CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb 
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 
 ifndef SCHED_POLICY
-SCHED_POLICY = MULTILEVEL_SCHED
+SCHED_POLICY = 0
 endif
-CFLAGS += -D$(SCHED_POLICY)
+CFLAGS += -DMULTILEVEL_SCHED=1 -DMLFQ_SCHED=2 -DSCHED_POLICY=$(SCHED_POLICY)
 
 ifndef MLFQ_K
 MLFQ_K = 3

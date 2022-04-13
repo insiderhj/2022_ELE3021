@@ -3,14 +3,15 @@
 
 int
 myfunction(char *str) {
-	cprintf("%s\n", str);
-	return 0XABCDABCD;
+  cprintf("%s\n", str);
+  return 0XABCDABCD;
 }
 
 // Wrapper for my_syscall
-int sys_myfunction(void) {
-	char *str;
-	// Decode argument using argstr
-	if (argstr(0, &str) < 0) return -1;
-	return myfunction(str);
+int
+sys_myfunction(void) {
+  char *str;
+  // Decode argument using argstr
+  if (argstr(0, &str) < 0) return -1;
+  return myfunction(str);
 }

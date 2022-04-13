@@ -49,6 +49,41 @@ sys_getppid(void)
 }
 
 int
+sys_yield(void)
+{
+  yield();
+  return 0;
+}
+
+int
+sys_getlev(void)
+{
+  return myproc()->qlevel;
+}
+
+int
+setpriority(int pid, int priority)
+{
+  if(priority < 0 || priority > 10) return -2;
+
+  struct proc *p = getproc(pid);
+  if(p->parent->pid != myproc()->pid) return -1;
+
+  p->priority = priority;
+  return 0;
+}
+
+int
+sys_setpriority(void)
+{
+  int pid;
+  int priority;
+
+  if(argint(0, &pid) < 0 || argint(1, &priority)) return -1;
+  return setpriority(pid, priority);
+}
+
+int
 sys_sbrk(void)
 {
   int addr;
