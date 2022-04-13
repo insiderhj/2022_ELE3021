@@ -86,7 +86,7 @@ endif
 CFLAGS += -DMULTILEVEL_SCHED=1 -DMLFQ_SCHED=2 -DSCHED_POLICY=$(SCHED_POLICY)
 
 ifndef MLFQ_K
-MLFQ_K = 3
+MLFQ_K = 5
 endif
 CFLAGS += -DMLFQ_K=$(MLFQ_K)
 
@@ -195,6 +195,8 @@ UPROGS=\
 	_zombie\
 	_my_userapp\
 	_project01\
+	_ml_test\
+	_mlfq_test\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -264,7 +266,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 EXTRA=\
 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
-	printf.c umalloc.c my_userapp.c project01.c\
+	printf.c umalloc.c my_userapp.c project01.c ml_test.c mlfq_test.c\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 

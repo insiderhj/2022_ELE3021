@@ -8,8 +8,6 @@
 #include "spinlock.h"
 
 struct {
-  int totalproc;
-  int qcnt[MLFQ_K + 1];
   struct proc *runningproc[MLFQ_K];
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -28,12 +26,9 @@ pinit(void)
 {
   initlock(&ptable.lock, "ptable");
 
-  ptable.totalproc = 0;
   for(int i = 0; i < MLFQ_K; i++) {
-    ptable.qcnt[i] = 0;
     ptable.runningproc[i] = 0;
   }
-  ptable.qcnt[MLFQ_K] = 0;
 }
 
 // Must be called with interrupts disabled
@@ -111,11 +106,11 @@ allocproc(void)
   return 0;
 
 found:
-  ptable.qcnt[0]++;
   p->state = EMBRYO;
   p->pid = nextpid++;
   p->qlevel = 0;
   p->priority = 0;
+  p->usedtq = 0;
 
   release(&ptable.lock);
 
@@ -141,6 +136,38 @@ found:
   p->context->eip = (uint)forkret;
 
   return p;
+}
+
+void resetproc(struct proc* p)
+{
+  acquire(&ptable.lock);
+  if (ptable.runningproc[p->qlevel] == p)
+    ptable.runningproc[p->qlevel] = 0;
+  p->usedtq = 0;
+  p->qlevel = 0;
+  release(&ptable.lock);
+}
+
+void increasetq(struct proc *p)
+{
+  acquire(&ptable.lock);
+  p->usedtq++;
+  release(&ptable.lock);
+}
+
+void priorityboost(void)
+{
+  acquire(&ptable.lock);
+  for(int i = 0; i < MLFQ_K; i++) {
+    ptable.runningproc[i] = 0;
+  }
+
+  struct proc *p;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+    p->qlevel = 0;
+    p->usedtq = 0;
+  }
+  release(&ptable.lock);
 }
 
 //PAGEBREAK: 32
@@ -325,8 +352,6 @@ wait(void)
         p->state = UNUSED;
 	
 	// update process count
-	ptable.qcnt[p->qlevel]--;
-	ptable.totalproc--;
 	p->qlevel = 0;
         p->usedtq = 0;
 
@@ -364,7 +389,6 @@ scheduler(void)
  
 // Multilevel scheduler
 #if SCHED_POLICY == MULTILEVEL_SCHED
-  cprintf("SCHED_POLICY == MULTILEVEL_SCHED\n");
   int even_flag = 0;
   for(;;){
     // Enable interrupts on this processor.
@@ -429,17 +453,12 @@ scheduler(void)
 
 // MLFQ scheduler
 #elif SCHED_POLICY == MLFQ_SCHED
-  cprintf("SCHED_POLICY == MLFQ_SCHED\n");
   for(;;){
     sti();
 
     acquire(&ptable.lock);
     for(int i = 0; i < MLFQ_K; i++) {
       int maxtq = i * 4 + 2;
-
-      // cprintf("%d queue: %d\n", i, ptable.qcnt[i]);
-      // if current level queue don't have any process continue
-      if (ptable.qcnt[i] == 0) continue;
 
       // vip: selected process to run
       struct proc *vip = 0;
@@ -450,8 +469,6 @@ scheduler(void)
 	// if time quantum has overed
         if(ptable.runningproc[i]->usedtq < maxtq) vip = ptable.runningproc[i];
 	else {
-	  ptable.qcnt[i]--;
-	  ptable.qcnt[i+1]++;
           ptable.runningproc[i]->qlevel++;
 	  ptable.runningproc[i]->usedtq = 0;
 	  ptable.runningproc[i] = 0;
@@ -488,7 +505,6 @@ scheduler(void)
 
 // default scheduler (round robin)
 #else
-  cprintf("SCHED_POLICY == DEFAULT\n");
   for(;;){
 
     sti();

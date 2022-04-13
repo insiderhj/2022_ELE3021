@@ -1,6 +1,6 @@
 XV6_DIR=/home/insiderhj/OS/xv6-public/
 
 make clean
-make SCHED_POLICY=MLFQ_SCHED CPUS=1
+make SCHED_POLICY=MLFQ_SCHED CPUS=1 MLFQ_K=5
 make fs.img
 qemu-system-i386 -nographic -serial mon:stdio -hdb fs.img  xv6.img -smp 1 -m 512

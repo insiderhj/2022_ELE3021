@@ -51,6 +51,7 @@ sys_getppid(void)
 int
 sys_yield(void)
 {
+  resetproc(myproc());
   yield();
   return 0;
 }
@@ -105,6 +106,8 @@ sys_sleep(void)
 
   if(argint(0, &n) < 0)
     return -1;
+  
+  resetproc(myproc());
   acquire(&tickslock);
   ticks0 = ticks;
   while(ticks - ticks0 < n){
