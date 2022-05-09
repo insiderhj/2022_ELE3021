@@ -34,4 +34,6 @@ SYSCALL(myfunction)
 SYSCALL(yield)
 SYSCALL(getlev)
 SYSCALL(setpriority)
-
+SYSCALL(thread_create)
+SYSCALL(thread_exit)
+SYSCALL(thread_join)

@@ -7,6 +7,10 @@
 #include "proc.h"
 #include "spinlock.h"
 
+#ifndef MLFQ_K
+#define MLFQ_K 5
+#endif
+
 struct {
   struct proc *runningproc[MLFQ_K];
   struct spinlock lock;
@@ -16,6 +20,7 @@ struct {
 static struct proc *initproc;
 
 int nextpid = 1;
+int nexttid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -108,9 +113,21 @@ getproc(int pid) {
 }
 
 static struct thread*
-allocthread(struct thread *t)
+allocthread(struct proc *p)
 {
+  struct thread *t;
   char *sp;
+
+  for(t = p->threads; p < &p->threads[NPROC]; t++)
+    if(t->state == UNUSED)
+      goto foundt;
+
+  return 0;
+
+foundt:
+
+  t->state = EMBRYO;
+  t->tid = nexttid++;
 
   // Allocate kernel stack.
   if((t->kstack = kalloc()) == 0){
@@ -133,6 +150,8 @@ allocthread(struct thread *t)
   t->context = (struct context*)sp;
   memset(t->context, 0, sizeof *t->context);
   t->context->eip = (uint)forkret;
+
+  p->threadcnt++;
 
   return t;
 }
@@ -161,11 +180,7 @@ found:
   p->pid = nextpid++;
 
   // allocate main thread in p.threads[0] //hj
-  t = allocthread(p->threads);
-  if (t != 0) {
-    p->threadcnt++;
-    p->threadcnt = 1;
-  }
+  t = allocthread(p);
 
   release(&ptable.lock);
 
@@ -355,6 +370,7 @@ exit(void)
   iput(curproc->cwd);
   end_op();
   curproc->cwd = 0;
+  curproc->threadcnt = 0;
 
   acquire(&ptable.lock);
 
@@ -379,8 +395,6 @@ exit(void)
   for(t = curproc->threads; t < &curproc->threads[NTHREAD]; t++) 
     if(t->state != UNUSED)
       t->state = ZOMBIE;
-  
-  curproc->threadcnt = 0;
 
   sched();
   panic("zombie exit");
@@ -418,7 +432,7 @@ wait(void)
 
       if (iszombie) {
         freevm(p->pgdir);
-        
+
         pid = p->pid;
         p->pid = 0;
         p->parent = 0;
