@@ -107,6 +107,36 @@ getproc(int pid) {
   return p;
 }
 
+static struct thread*
+allocthread(struct thread *t)
+{
+  char *sp;
+
+  // Allocate kernel stack.
+  if((t->kstack = kalloc()) == 0){
+    t->state = UNUSED;
+    return 0;
+  }
+
+  sp = t->kstack + KSTACKSIZE;
+
+  // Leave room for trap frame.
+  sp -= sizeof *t->tf;
+  t->tf = (struct trapframe*)sp;
+
+  // Set up new context to start executing at forkret,
+  // which returns to trapret.
+  sp -= 4;
+  *(uint*)sp = (uint)trapret;
+
+  sp -= sizeof *t->context;
+  t->context = (struct context*)sp;
+  memset(t->context, 0, sizeof *t->context);
+  t->context->eip = (uint)forkret;
+
+  return t;
+}
+
 //PAGEBREAK: 32
 // Look in the process table for an UNUSED proc.
 // If found, change state to EMBRYO and initialize
@@ -140,36 +170,6 @@ found:
   release(&ptable.lock);
 
   return p;
-}
-
-static struct thread*
-allocthread(struct thread *t)
-{
-  char *sp;
-
-  // Allocate kernel stack.
-  if((t->kstack = kalloc()) == 0){
-    t->state = UNUSED;
-    return 0;
-  }
-
-  sp = t->kstack + KSTACKSIZE;
-
-  // Leave room for trap frame.
-  sp -= sizeof *t->tf;
-  t->tf = (struct trapframe*)sp;
-
-  // Set up new context to start executing at forkret,
-  // which returns to trapret.
-  sp -= 4;
-  *(uint*)sp = (uint)trapret;
-
-  sp -= sizeof *t->context;
-  t->context = (struct context*)sp;
-  memset(t->context, 0, sizeof *t->context);
-  t->context->eip = (uint)forkret;
-
-  return t;
 }
 
 void resetproc(struct proc* p)
