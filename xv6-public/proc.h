@@ -46,7 +46,7 @@ struct proc {
   int qlevel;	       	       // MLFQ queue level
   int priority;                // MLFQ priority
   int usedtq;                  // used time quantum
-  struct thread threads[NTHREAD]
+  struct thread threads[NTHREAD];
   int threadcnt;
 };
 
