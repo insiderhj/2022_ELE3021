@@ -217,10 +217,10 @@ userinit(void)
   t = p->threads;
   
   initproc = p;
-  if((t->pgdir = setupkvm()) == 0)
+  if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
-  inituvm(t->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-  t->sz = PGSIZE;
+  inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
+  p->sz = PGSIZE;
   memset(t->tf, 0, sizeof(*t->tf));
   t->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   t->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -250,18 +250,19 @@ int
 growproc(int n)
 {
   uint sz;
+  struct proc *curproc = myproc();
   struct thread *curthread = mythread();
 
-  sz = curthread->sz;
+  sz = curproc->sz;
   if(n > 0){
-    if((sz = allocuvm(curthread->pgdir, sz, sz + n)) == 0)
+    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   } else if(n < 0){
-    if((sz = deallocuvm(curthread->pgdir, sz, sz + n)) == 0)
+    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }
-  curthread->sz = sz;
-  switchuvm(curthread);
+  curproc->sz = sz;
+  switchuvm(curproc, curthread);
   return 0;
 }
 
@@ -293,17 +294,18 @@ fork(void)
   
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
-  for(nt = np->threads, ot = curproc->threads; nt < &np->threads[NTHREAD]; nt++, ot++) {
-    // Copy process state from proc.
-    if((nt->pgdir = copyuvm(ot->pgdir, ot->sz)) == 0){
-      for(tmpthread = np->threads; tmpthread < &np->threads[NTHREAD]; tmpthread++) {
-        kfree(tmpthread->kstack);
-        tmpthread->kstack = 0;
-        tmpthread->state = UNUSED;
-      }
-      return -1;
+  // Copy process state from proc.
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+    for(tmpthread = np->threads; tmpthread < &np->threads[NTHREAD]; tmpthread++) {
+      kfree(tmpthread->kstack);
+      tmpthread->kstack = 0;
+      tmpthread->state = UNUSED;
     }
-    nt->sz = ot->sz;
+    return -1;
+  }
+  np->sz = curproc->sz;
+
+  for(nt = np->threads, ot = curproc->threads; nt < &np->threads[NTHREAD]; nt++, ot++) {
     *nt->tf = *ot->tf;
 
     // Clear %eax so that fork returns 0 in the child.
@@ -315,6 +317,8 @@ fork(void)
       nt->state = RUNNABLE;
 
       release(&ptable.lock);
+    } else {
+      nt->state = ot->state;
     }
   }
   
@@ -406,7 +410,6 @@ wait(void)
           // Found one.
           kfree(t->kstack);
           t->kstack = 0;
-          freevm(t->pgdir);
           t->state = UNUSED;
 	
           iszombie = 1;
@@ -414,6 +417,8 @@ wait(void)
       }
 
       if (iszombie) {
+        freevm(p->pgdir);
+        
         pid = p->pid;
         p->pid = 0;
         p->parent = 0;
@@ -591,7 +596,7 @@ scheduler(void)
 
         c->proc = p;
         c->thread = t;
-        switchuvm(t);
+        switchuvm(p, t);
         t->state = RUNNING;
 
         swtch(&(c->scheduler), t->context);

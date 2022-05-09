@@ -37,8 +37,6 @@ enum threadstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 struct thread {
   thread_t tid;                // Thread ID
-  uint sz;                     // Size of process memory (bytes)
-  pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
@@ -50,6 +48,8 @@ struct thread {
 // Per-process state
 struct proc {
   int pid;                     // Process ID
+  uint sz;                     // Size of process memory (bytes)
+  pde_t* pgdir;                // Page table
   struct proc *parent;         // Parent process
   int killed;                  // If non-zero, have been killed
   struct file *ofile[NOFILE];  // Open files
