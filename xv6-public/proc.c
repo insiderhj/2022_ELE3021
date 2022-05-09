@@ -118,7 +118,7 @@ allocthread(struct proc *p)
   struct thread *t;
   char *sp;
 
-  for(t = p->threads; p < &p->threads[NPROC]; t++)
+  for(t = p->threads; t < &p->threads[NPROC]; t++)
     if(t->state == UNUSED)
       goto foundt;
 
