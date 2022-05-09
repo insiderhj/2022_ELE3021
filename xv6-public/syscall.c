@@ -59,7 +59,7 @@ int
 argptr(int n, char **pp, int size)
 {
   int i;
-  struct proc *curthread = mythread();
+  struct thread *curthread = mythread();
  
   if(argint(n, &i) < 0)
     return -1;
