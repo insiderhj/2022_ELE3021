@@ -372,7 +372,7 @@ exit(void)
   }
 
   // Jump into the scheduler, never to return.
-  for(t = p->threads; t < &p->threads[NTHREAD]; t++)
+  for(t = curproc->threads; t < &curproc->threads[NTHREAD]; t++) 
     if(t->state != UNUSED)
       t->state = ZOMBIE;
   
