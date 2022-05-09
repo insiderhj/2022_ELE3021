@@ -214,7 +214,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
-  t = p->threads[0];
+  t = p->threads;
   
   initproc = p;
   if((t->pgdir = setupkvm()) == 0)
@@ -668,6 +668,7 @@ forkret(void)
 void
 sleep(void *chan, struct spinlock *lk)
 {
+  struct proc *p = myproc();
   struct thread *t = mythread();
   
   if(p == 0)
