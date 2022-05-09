@@ -45,7 +45,7 @@ struct thread {
   void *chan;                  // If non-zero, sleeping on chan
   enum threadstate state;        // Process state
   struct proc *parent;         // parent process
-}
+};
 
 // Per-process state
 struct proc {
