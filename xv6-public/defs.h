@@ -110,6 +110,7 @@ int             growproc(int);
 int             kill(int);
 struct cpu*     mycpu(void);
 struct proc*    myproc();
+struct thread*  mythread();
 struct proc*    getproc(int);
 void		resetproc(struct proc*);
 void		increasetq(struct proc*);
