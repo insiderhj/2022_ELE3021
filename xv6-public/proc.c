@@ -713,7 +713,7 @@ wakeup1(void *chan)
   struct thread *t;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    for (t = p->threads; &p->threads[NTHREAD]; t++)
+    for (t = p->threads; t < &p->threads[NTHREAD]; t++)
       if(t->state == SLEEPING && t->chan == chan)
         t->state = RUNNABLE;
 }
