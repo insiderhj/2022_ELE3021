@@ -165,7 +165,6 @@ static struct proc*
 allocproc(void)
 {
   struct proc *p;
-  struct thread *t;
 
   acquire(&ptable.lock);
 
@@ -180,7 +179,7 @@ found:
   p->pid = nextpid++;
 
   // allocate main thread in p.threads[0] //hj
-  t = allocthread(p);
+  allocthread(p);
 
   release(&ptable.lock);
 
