@@ -17,9 +17,9 @@
 int
 fetchint(uint addr, int *ip)
 {
-  struct proc *curproc = myproc();
+  struct thread *curthread = mythread();
 
-  if(addr >= curproc->sz || addr+4 > curproc->sz)
+  if(addr >= curthread->sz || addr+4 > curthread->sz)
     return -1;
   *ip = *(int*)(addr);
   return 0;
@@ -32,12 +32,12 @@ int
 fetchstr(uint addr, char **pp)
 {
   char *s, *ep;
-  struct proc *curproc = myproc();
+  struct thread *curthread = mythread();
 
-  if(addr >= curproc->sz)
+  if(addr >= curthread->sz)
     return -1;
   *pp = (char*)addr;
-  ep = (char*)curproc->sz;
+  ep = (char*)curthread->sz;
   for(s = *pp; s < ep; s++){
     if(*s == 0)
       return s - *pp;
@@ -59,11 +59,11 @@ int
 argptr(int n, char **pp, int size)
 {
   int i;
-  struct proc *curproc = myproc();
+  struct proc *curthread = mythread();
  
   if(argint(n, &i) < 0)
     return -1;
-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
+  if(size < 0 || (uint)i >= curthread->sz || (uint)i+size > curthread->sz)
     return -1;
   *pp = (char*)i;
   return 0;
