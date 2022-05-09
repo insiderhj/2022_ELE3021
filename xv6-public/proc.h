@@ -35,6 +35,18 @@ struct context {
 
 enum threadstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+struct thread {
+  thread_t tid;                // Thread ID
+  uint sz;                     // Size of process memory (bytes)
+  pde_t* pgdir;                // Page table
+  char *kstack;                // Bottom of kernel stack for this process
+  struct trapframe *tf;        // Trap frame for current syscall
+  struct context *context;     // swtch() here to run process
+  void *chan;                  // If non-zero, sleeping on chan
+  enum threadstate state;        // Process state
+  struct proc *parent;         // parent process
+}
+
 // Per-process state
 struct proc {
   int pid;                     // Process ID
@@ -49,18 +61,6 @@ struct proc {
   struct thread threads[NTHREAD];
   int threadcnt;
 };
-
-struct thread {
-  thread_t tid;                // Thread ID
-  uint sz;                     // Size of process memory (bytes)
-  pde_t* pgdir;                // Page table
-  char *kstack;                // Bottom of kernel stack for this process
-  struct trapframe *tf;        // Trap frame for current syscall
-  struct context *context;     // swtch() here to run process
-  void *chan;                  // If non-zero, sleeping on chan
-  enum procstate state;        // Process state
-  struct proc *parent;         // parent process
-}
 
 // Process memory is laid out contiguously, low addresses first:
 //   text
