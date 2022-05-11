@@ -18,7 +18,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct thread *curthread = mythread();
-  struct proc *curproc = curthread->parent;
+  struct proc *curproc = curthread->proc;
 
   begin_op();
 

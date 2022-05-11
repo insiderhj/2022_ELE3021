@@ -45,7 +45,7 @@ sys_getpid(void)
 int
 sys_getppid(void)
 {
-  return myproc()->parent->pid;
+  return myproc()->parent->proc->pid;
 }
 
 int
@@ -68,7 +68,7 @@ setpriority(int pid, int priority)
   if(priority < 0 || priority > 10) return -2;
 
   struct proc *p = getproc(pid);
-  if(p->parent->pid != myproc()->pid) return -1;
+  if(p->parent->proc->pid != myproc()->pid) return -1;
 
   p->priority = priority;
   return 0;

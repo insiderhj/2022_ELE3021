@@ -42,7 +42,7 @@ pinit(void)
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
     for(t = p->threads; t < &p->threads[NTHREAD]; t++) {
-      t->parent = p;
+      t->proc = p;
     }
   }
   release(&ptable.lock);
@@ -274,7 +274,7 @@ growproc(int n)
 {
   uint sz;
   struct thread *curthread = mythread();
-  struct proc *curproc = curthread->parent;
+  struct proc *curproc = curthread->proc;
 
   sz = curproc->sz;
   if(n > 0){
@@ -339,7 +339,7 @@ thread_exit(void *retval)
   acquire(&ptable.lock);
 
   // other threads might be sleeping in thread_join().
-  wakeup2(curthread->parent);
+  wakeup2(curthread->proc);
 
   curthread->state = ZOMBIE;
   curthread->retval = retval;
@@ -352,7 +352,7 @@ int
 thread_join(thread_t thread, void **retval)
 {
   struct thread *curthread = mythread();
-  struct proc *curproc = curthread->parent;
+  struct proc *curproc = curthread->proc;
   struct thread *t;
   
   acquire(&ptable.lock);
@@ -391,7 +391,8 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct thread *nt;
-  struct proc *curproc = myproc();
+  struct thread *curthread = mythread();
+  struct proc *curproc = curthread->proc;
   struct thread *ot;
 
   // Allocate process.
@@ -399,7 +400,7 @@ fork(void)
     return -1;
   }
 
-  np->parent = curproc;
+  np->parent = curthread;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -483,8 +484,8 @@ exit(void)
 
   // Pass abandoned children to init. 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
-      p->parent = initproc;
+    if(p->parent->proc == curproc){
+      p->parent = &initproc->threads[0];
       iszombie = 1;
       for(t = p->threads; t < &p->threads[NTHREAD]; t++)
         if(t->state != ZOMBIE && t->state != UNUSED)
@@ -512,14 +513,15 @@ wait(void)
   struct proc *p;
   struct thread *t;
   int havekids, pid, iszombie;
-  struct proc *curproc = myproc();
+  struct thread *curthread = mythread();
+  struct proc *curproc = curthread->proc;
   
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      if(p->parent != curthread)
         continue;
       havekids = 1;
       iszombie = 1;
@@ -560,7 +562,7 @@ wait(void)
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+    sleep(curthread, &ptable.lock);  //DOC: wait-sleep
   }
 }
 
@@ -808,7 +810,7 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct thread *t = mythread();
-  struct proc *p = t->parent;
+  struct proc *p = t->proc;
   
   if(p == 0)
     panic("sleep");
