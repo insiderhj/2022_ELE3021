@@ -282,7 +282,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   uint sp, sz;
 
   sz = PGROUNDUP(sz);
-  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0) 
+  if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0) 
     return 0;
 
   acquire(&ptable.lock);
@@ -295,7 +295,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   sp = sz;
 
   sp -= 4;
-  *(*uint)sp = (uint)arg;
+  *(uint*)sp = (uint)arg;
 
   t->tf->eip = (uint)start_routine;
   t->tf->esp = (uint)sp;
@@ -311,9 +311,6 @@ void
 thread_exit(void *retval)
 {
   struct thread *curthread = mythread();
-
-  curproc->cwd = 0;
-  curproc->threadcnt = 0;
 
   acquire(&ptable.lock);
 
@@ -336,7 +333,7 @@ thread_join(thread_t thread, void **retval)
   
   acquire(&ptable.lock);
   for(;;){
-    for(t = curproc->threads; t < &curproc.threads[NTHREAD]; t++){
+    for(t = curproc->threads; t < &curproc->threads[NTHREAD]; t++){
       if(t->state == ZOMBIE) {
         *retval = t->retval;
         t->retval = 0;
@@ -853,6 +850,7 @@ wakeup1(void *chan)
         t->state = RUNNABLE;
 }
 
+static void
 wakeup2(void *chan)
 {
   struct proc *p;
