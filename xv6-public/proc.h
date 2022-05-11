@@ -7,8 +7,7 @@ struct cpu {
   volatile uint started;       // Has the CPU started?
   int ncli;                    // Depth of pushcli nesting.
   int intena;                  // Were interrupts enabled before pushcli?
-  struct proc *proc;           // The process running on this cpu or null
-  struct thread *thread;
+  struct thread *thread;      // The thread running on this cpu or null
 };
 
 extern struct cpu cpus[NCPU];

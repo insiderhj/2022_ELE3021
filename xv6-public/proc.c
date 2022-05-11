@@ -25,6 +25,7 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+static void wakeup2(void *chan);
 
 void
 pinit(void)
@@ -275,13 +276,10 @@ growproc(int n)
 struct thread*
 thread_create(thread_t *thread, void *start_routine, void *arg)
 {
+  struct thread *curthread = mythread();
   struct proc *curproc = myproc();
   struct thread *t;
-  uint sz;
-  char *sp;
-
-  if((mem = kalloc()) == 0) 
-    return 0;
+  uint sp, sz;
 
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0) 
@@ -299,8 +297,8 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   sp -= 4;
   *(*uint)sp = (uint)arg;
 
-  t->tf->eip = start_routine;
-  t->tf->esp = sp;
+  t->tf->eip = (uint)start_routine;
+  t->tf->esp = (uint)sp;
   *thread = t->tid;
   switchuvm(curthread);
 
@@ -313,8 +311,6 @@ void
 thread_exit(void *retval)
 {
   struct thread *curthread = mythread();
-  struct thread *t;
-  int fd;
 
   curproc->cwd = 0;
   curproc->threadcnt = 0;
@@ -556,7 +552,6 @@ scheduler(void)
   struct proc *p;
   struct thread *t;
   struct cpu *c = mycpu();
-  c->proc = 0;
   c->thread = 0;
  
 // Multilevel scheduler
@@ -692,7 +687,6 @@ scheduler(void)
       for(t = p->threads; t < &p->threads[NTHREAD]; t++) {
         if(t->state != RUNNABLE) continue;
 
-        c->proc = p;
         c->thread = t;
         switchuvm(t);
         t->state = RUNNING;
@@ -700,7 +694,6 @@ scheduler(void)
         swtch(&(c->scheduler), t->context);
         switchkvm();
 
-        c->proc = 0;
         c->thread = 0;
       }
     }
