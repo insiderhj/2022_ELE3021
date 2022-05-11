@@ -154,15 +154,13 @@ switchkvm(void)
 
 // Switch TSS and h/w page table to correspond to process p.
 void
-switchuvm(struct thread *t)
+switchuvm(struct proc *p, struct thread *t)
 {
   if(t == 0)
     panic("switchuvm: no thread");
   if(t->kstack == 0)
     panic("switchuvm: no kstack");
-  if(t->parent == 0)
-    panic("switchuvm: no process");
-  if(t->parent->pgdir == 0)
+  if(p->pgdir == 0)
     panic("switchuvm: no pgdir");
 
   pushcli();
@@ -175,7 +173,7 @@ switchuvm(struct thread *t)
   // forbids I/O instructions (e.g., inb and outb) from user space
   mycpu()->ts.iomb = (ushort) 0xFFFF;
   ltr(SEG_TSS << 3);
-  lcr3(V2P(t->parent->pgdir));  // switch to process's address space
+  lcr3(V2P(p->pgdir));  // switch to process's address space
   popcli();
 }
 

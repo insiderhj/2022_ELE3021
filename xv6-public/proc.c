@@ -269,7 +269,7 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
-  switchuvm(curthread);
+  switchuvm(curproc, curthread);
   return 0;
 }
 
@@ -301,7 +301,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   t->tf->eip = (uint)start_routine;
   t->tf->esp = (uint)sp;
   *thread = t->tid;
-  switchuvm(curthread);
+  switchuvm(curproc, curthread);
 
   release(&ptable.lock);
 
@@ -683,10 +683,11 @@ scheduler(void)
     acquire(&ptable.lock); 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       for(t = p->threads; t < &p->threads[NTHREAD]; t++) {
+        cprintf("%d: %d\n", p->pid, p->threadcnt);
         if(t->state != RUNNABLE) continue;
 
         c->thread = t;
-        switchuvm(t);
+        switchuvm(p, t);
         t->state = RUNNING;
 
         swtch(&(c->scheduler), t->context);

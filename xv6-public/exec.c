@@ -100,7 +100,7 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curthread->tf->eip = elf.entry;  // main
   curthread->tf->esp = sp;
-  switchuvm(curthread);
+  switchuvm(curproc, curthread);
   freevm(oldpgdir);
   return 0;
 
