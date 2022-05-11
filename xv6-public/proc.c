@@ -287,18 +287,19 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   struct thread *t;
   uint sp, sz;
 
-  sz = 0;
+  sz = curproc->sz;
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0) 
     return 0;
 
   acquire(&ptable.lock);
   if((t = allocthread(curproc)) == 0) {
+    deallocuvm(curproc->pgdir, sz + 2*PGSIZE, sz);
     release(&ptable.lock);
     return 0;
   }
 
-  clearpteu(curproc->pgdir, (char*)(sz - 2*PGSIZE));
+  curproc->sz = sz;
   sp = sz;
 
   sp -= 4;
