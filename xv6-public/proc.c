@@ -93,7 +93,7 @@ myproc(void) {
   c = mycpu();
   p = c->proc;
   popcli();
-  return t;
+  return p;
 }
 
 struct proc*
