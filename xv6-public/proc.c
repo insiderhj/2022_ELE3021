@@ -305,12 +305,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   sp -= 4;
   *(uint*)sp = (uint)arg;
 
-  memset(t->tf, 0, sizeof(*t->tf));
-  t->tf->cs = (SEG_UCODE << 3) | DPL_USER;
-  t->tf->ds = (SEG_UDATA << 3) | DPL_USER;
-  t->tf->es = t->tf->ds;
-  t->tf->ss = t->tf->ds;
-  t->tf->eflags = FL_IF;
+  *t->tf = *curthread.tf;
   t->tf->eip = (uint)start_routine;
   t->tf->esp = (uint)sp;
   *thread = t->tid;
