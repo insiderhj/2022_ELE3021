@@ -161,9 +161,10 @@ foundt:
 // state required to run in the kernel.
 // Otherwise return 0.
 static struct proc*
-allocproc(void)
+allocproc(int threads)
 {
   struct proc *p;
+  int i, j;
 
   acquire(&ptable.lock);
 
@@ -178,7 +179,16 @@ found:
   p->pid = nextpid++;
 
   // allocate main thread in p.threads[0] //hj
-  allocthread(p);
+  for(i = 0; i < threads; i++) {
+    if (allocthread(p) == 0) {
+      for(j = 0; j < i; j++) {
+        kfree(p->threads[i].kstack);
+        p->threads[i].kstack = 0;
+        p->threads[i].state = UNUSED;
+      }
+      return 0;
+    }
+  }
 
   release(&ptable.lock);
 
@@ -226,7 +236,7 @@ userinit(void)
   struct thread *t;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
-  p = allocproc();
+  p = allocproc(1);
   t = p->threads;
   
   initproc = p;
@@ -286,7 +296,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   struct proc *curproc = myproc();
   struct thread *t;
   uint sp, sz;
-
+  
   sz = curproc->sz;
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0) 
@@ -305,6 +315,9 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   sp -= 4;
   *(uint*)sp = (uint)arg;
 
+  sp -= 4;
+  *(uint*)sp = (uint)thread_exit;
+
   *t->tf = *curthread->tf;
   t->tf->eip = (uint)start_routine;
   t->tf->esp = (uint)sp;
@@ -312,7 +325,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
 
   switchuvm(curproc, curthread);
   t->state = RUNNABLE;
-
+  
   release(&ptable.lock);
 
   return t;
@@ -345,7 +358,7 @@ thread_join(thread_t thread, void **retval)
   acquire(&ptable.lock);
   for(;;){
     for(t = curproc->threads; t < &curproc->threads[NTHREAD]; t++){
-      if(t->state == ZOMBIE) {
+      if(t->state == ZOMBIE && t->tid == thread) {
         *retval = t->retval;
         t->retval = 0;
 
@@ -353,6 +366,7 @@ thread_join(thread_t thread, void **retval)
         t->kstack = 0;
         t->state = UNUSED;
         curproc->threadcnt--;
+        release(&ptable.lock);
         return 0;
       }
     }
@@ -377,12 +391,11 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct thread *nt;
-  struct thread *tmpthread;
   struct proc *curproc = myproc();
   struct thread *ot;
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if((np = allocproc(NTHREAD)) == 0){
     return -1;
   }
 
@@ -391,6 +404,7 @@ fork(void)
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
+
   np->cwd = idup(curproc->cwd);
   np->threadcnt = curproc->threadcnt;
   
@@ -398,16 +412,20 @@ fork(void)
 
   // Copy process state from proc.
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
-    for(tmpthread = np->threads; tmpthread < &np->threads[NTHREAD]; tmpthread++) {
-      kfree(tmpthread->kstack);
-      tmpthread->kstack = 0;
-      tmpthread->state = UNUSED;
+    for(nt = np->threads; nt < &np->threads[NTHREAD]; nt++){
+      kfree(nt->kstack);
+      nt->kstack = 0;
+      nt->state = UNUSED;
     }
     return -1;
   }
   np->sz = curproc->sz;
 
   for(nt = np->threads, ot = curproc->threads; nt < &np->threads[NTHREAD]; nt++, ot++) {
+    if(ot->state == UNUSED) {
+      kfree(nt->kstack);
+      nt->kstack = 0;
+    }
     *nt->tf = *ot->tf;
 
     // Clear %eax so that fork returns 0 in the child.
@@ -560,6 +578,8 @@ scheduler(void)
 {
   struct proc *p;
   struct thread *t;
+  // struct proc *tempp;
+  // struct thread *tempt;
   struct cpu *c = mycpu();
   c->proc = 0;
   c->thread = 0;
@@ -692,6 +712,7 @@ scheduler(void)
 
     sti();
 
+
     acquire(&ptable.lock); 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       for(t = p->threads; t < &p->threads[NTHREAD]; t++) {
@@ -701,6 +722,16 @@ scheduler(void)
         c->thread = t;
         switchuvm(p, t);
         t->state = RUNNING;
+
+        
+    // for(tempp = ptable.proc; tempp < &ptable.proc[NPROC]; tempp++){
+    //   if(tempp->pid < 3) continue;
+    //   cprintf("%d: ", tempp->pid);
+    //   for(tempt = tempp->threads; tempt < &tempp->threads[NTHREAD]; tempt++) {
+    //     cprintf("%d %d %d / ", tempt->state, tempt->tf->eip, tempt->tf->esp);
+    //   }
+    //   cprintf("\n");
+    // }
 
         swtch(&(c->scheduler), t->context);
         switchkvm();
