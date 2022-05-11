@@ -281,6 +281,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   struct thread *t;
   uint sp, sz;
 
+  sz = 0;
   sz = PGROUNDUP(sz);
   if((sz = allocuvm(curproc->pgdir, sz, sz + 2*PGSIZE)) == 0) 
     return 0;
