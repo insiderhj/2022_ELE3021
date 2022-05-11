@@ -509,10 +509,11 @@ wait(void)
 
       if(p->threadcnt != 0 && iszombie) {
         for(t = p->threads; t < &p->threads[NTHREAD]; t++) {
-          // Found one.
-          kfree(t->kstack);
-          t->kstack = 0;
-          t->state = UNUSED;
+          if(t->state == ZOMBIE) {
+            kfree(t->kstack);
+            t->kstack = 0;
+            t->state = UNUSED;
+          }
         }
 
         freevm(p->pgdir);
