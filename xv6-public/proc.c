@@ -305,7 +305,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   sp -= 4;
   *(uint*)sp = (uint)arg;
 
-  *t->tf = *curthread.tf;
+  *t->tf = *curthread->tf;
   t->tf->eip = (uint)start_routine;
   t->tf->esp = (uint)sp;
   *thread = t->tid;
