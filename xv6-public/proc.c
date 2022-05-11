@@ -308,6 +308,8 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
   t->tf->eip = (uint)start_routine;
   t->tf->esp = (uint)sp;
   *thread = t->tid;
+
+  t->state = RUNNABLE;
   switchuvm(curproc, curthread);
 
   release(&ptable.lock);
