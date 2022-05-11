@@ -87,7 +87,13 @@ mythread(void) {
 
 struct proc*
 myproc(void) {
-  return mythread()->parent;
+  struct cpu *c;
+  struct thread *t;
+  pushcli();
+  c = mycpu();
+  t = c->thread;
+  popcli();
+  return t;
 }
 
 struct proc*
