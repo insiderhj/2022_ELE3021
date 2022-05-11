@@ -88,10 +88,10 @@ mythread(void) {
 struct proc*
 myproc(void) {
   struct cpu *c;
-  struct thread *t;
+  struct proc *p;
   pushcli();
   c = mycpu();
-  t = c->thread;
+  p = c->proc;
   popcli();
   return t;
 }
@@ -556,6 +556,7 @@ scheduler(void)
   struct proc *p;
   struct thread *t;
   struct cpu *c = mycpu();
+  c->proc = 0;
   c->thread = 0;
  
 // Multilevel scheduler
@@ -692,6 +693,7 @@ scheduler(void)
         cprintf("%d: %d\n", p->pid, p->threadcnt);
         if(t->state != RUNNABLE) continue;
 
+        c->proc = p;
         c->thread = t;
         switchuvm(p, t);
         t->state = RUNNING;
@@ -699,6 +701,7 @@ scheduler(void)
         swtch(&(c->scheduler), t->context);
         switchkvm();
 
+        c->proc = 0;
         c->thread = 0;
       }
     }
