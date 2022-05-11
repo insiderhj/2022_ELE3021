@@ -291,7 +291,7 @@ thread_create(thread_t *thread, void *start_routine, void *arg)
     return 0;
   }
 
-  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+  clearpteu(curproc->pgidr, (char*)(sz - 2*PGSIZE));
   sp = sz;
 
   sp -= 4;
