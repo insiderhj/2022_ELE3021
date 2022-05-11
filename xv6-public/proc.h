@@ -33,7 +33,7 @@ struct context {
   uint eip;
 };
 
-enum threadstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum threadstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE, THREAD_SLEEPING };
 
 struct thread {
   thread_t tid;                // Thread ID
@@ -43,6 +43,7 @@ struct thread {
   void *chan;                  // If non-zero, sleeping on chan
   enum threadstate state;        // Process state
   struct proc *parent;         // parent process
+  void *retval;
 };
 
 // Per-process state

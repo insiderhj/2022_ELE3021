@@ -87,13 +87,23 @@ sys_setpriority(void)
 int
 sys_thread_create(void)
 {
+  thread_t *tid;
+  void *start_routine;
+  void *arg;
 
-  return 0;
+  if(argint(0, &tid) < 0 || argint(1, &start_routine) < 0 || argint(2, &arg) < 0) return -1;
+  
+  if (thread_create(tid, start_routine, arg)) return 0;
+  return -1;
 }
 
 int
 sys_thread_exit(void)
 {
+  void *retval;
+
+  if(argint(0, &retval) < 0) return -1;
+  thread_exit(retval);
 
   return 0;
 }
@@ -101,8 +111,11 @@ sys_thread_exit(void)
 int
 sys_thread_join(void)
 {
+  thread_t thread;
+  void **retval;
 
-  return 0;
+  if(argint(0, &thread) < 0 || argint(1, &retval) < 0) return -1;
+  return thread_join(thread, retval);
 }
 
 int

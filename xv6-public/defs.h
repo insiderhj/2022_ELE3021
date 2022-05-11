@@ -125,6 +125,9 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+struct thread*  thread_create(thread_t*, void*, void*);
+void            thread_exit(void*);
+int             thread_join(thread_t, void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -186,7 +189,7 @@ void            freevm(pde_t*);
 void            inituvm(pde_t*, char*, uint);
 int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
 pde_t*          copyuvm(pde_t*, uint);
-void            switchuvm(struct proc*, struct thread*);
+void            switchuvm(struct thread*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);

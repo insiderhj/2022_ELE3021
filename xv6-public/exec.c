@@ -17,8 +17,8 @@ exec(char *path, char **argv)
   struct inode *ip;
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
-  struct proc *curproc = myproc();
   struct thread *curthread = mythread();
+  struct proc *curproc = curthread->parent;
 
   begin_op();
 
@@ -100,7 +100,7 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curthread->tf->eip = elf.entry;  // main
   curthread->tf->esp = sp;
-  switchuvm(curproc, curthread);
+  switchuvm(curthread);
   freevm(oldpgdir);
   return 0;
 
