@@ -1,3 +1,6 @@
+#define USERMAXCHAR 16
+#define MAXUSERS     10
+
 struct file {
   enum { FD_NONE, FD_PIPE, FD_INODE } type;
   int ref; // reference count
@@ -23,10 +26,17 @@ struct inode {
   short nlink;
   uint size;
   uint addrs[NDIRECT+1];
+
+  int mode;
+};
+
+struct xv6user {
+  char username[USERMAXCHAR];
+  char password[USERMAXCHAR];
 };
 
 // table mapping major device number to
-// device functions
+// device function
 struct devsw {
   int (*read)(struct inode*, char*, int);
   int (*write)(struct inode*, char*, int);

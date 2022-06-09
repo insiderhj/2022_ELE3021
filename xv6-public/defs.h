@@ -35,6 +35,12 @@ int             filestat(struct file*, struct stat*);
 int             filewrite(struct file*, char*, int n);
 
 // fs.c
+extern struct xv6user usr;
+int             max(int, int);
+int             login(char*, char*, char*);
+int             adduser(char*, char*);
+int             deleteuser(char*);
+void            logout(void);
 void            readsb(int dev, struct superblock *sb);
 int             dirlink(struct inode*, char*, uint);
 struct inode*   dirlookup(struct inode*, char*, uint*);

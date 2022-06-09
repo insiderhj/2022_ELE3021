@@ -111,6 +111,9 @@ extern int sys_setpriority(void);
 extern int sys_thread_create(void);
 extern int sys_thread_exit(void);
 extern int sys_thread_join(void);
+extern int sys_login(void);
+extern int sys_addUser(void);
+extern int sys_deleteUser(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -142,6 +145,9 @@ static int (*syscalls[])(void) = {
 [SYS_thread_create] sys_thread_create,
 [SYS_thread_exit] sys_thread_exit,
 [SYS_thread_join] sys_thread_join,
+[SYS_login]   sys_login,
+[SYS_addUser] sys_addUser,
+[SYS_deleteUser]  sys_deleteUser,
 };
 
 void

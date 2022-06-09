@@ -16,6 +16,10 @@
 #include "file.h"
 #include "fcntl.h"
 
+
+int openfile(char*, int);
+static struct inode* create(char*, short, short, short);
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -35,6 +39,15 @@ argfd(int n, int *pfd, struct file **pf)
   return 0;
 }
 
+struct file*
+getfile(int fd)
+{
+  struct file *f;
+  if(fd < 0 || fd >= NOFILE || (f=myproc()->ofile[fd]) == 0)
+    return 0;
+  return f;
+}
+
 // Allocate a file descriptor for the given file.
 // Takes over file reference from caller on success.
 static int
@@ -50,6 +63,150 @@ fdalloc(struct file *f)
     }
   }
   return -1;
+}
+
+int
+sys_login(void)
+{
+  char *users;
+  char *username;
+  char *password;
+
+  if(argptr(0, &users, 500) || argptr(1, &username, 50) || argptr(2, &password, 50))
+    return -1;
+  
+  return login(users, username, password);
+}
+
+int
+sys_addUser(void)
+{
+  char *username;
+  char *password;
+
+  int fd, i, j, tempi, usercount = 0;
+  struct file *f;
+  char filestr[500];
+  char temp[USERMAXCHAR] = {};
+  struct inode *ip;
+
+  if(argptr(0, &username, 50) || argptr(1, &password, 50))
+    return -1;
+  
+  begin_op();
+
+  fd = openfile("users", O_RDONLY);
+  f = getfile(fd);
+
+  fileread(f, filestr, 500);
+
+  myproc()->ofile[fd] = 0;
+  fileclose(f);
+
+  for(i = 0, tempi = 0; i < strlen(filestr); i++, tempi++) {
+    if(filestr[i] == ' ') {
+      if(!strncmp(temp, username, max(strlen(temp), strlen(username)))) {
+        end_op();
+        return -1;
+      }
+      usercount++;
+      tempi = -1;
+      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+    }
+    else if(filestr[i] == '\n') {
+      tempi = -1;
+      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+    }
+    else {
+      temp[tempi] = filestr[i];
+    }
+  }
+  if(usercount >= MAXUSERS) {
+    end_op();
+    return -1;
+  }
+
+  if((ip = create(username, T_DIR, 0, 0)) == 0){
+    end_op();
+    return -1;
+  }
+  iunlockput(ip);
+
+  fd = openfile("users", O_WRONLY);
+  f = getfile(fd);
+
+  filewrite(f, filestr, strlen(filestr));
+  filewrite(f, username, strlen(username));
+  filewrite(f, " ", strlen(" "));
+  filewrite(f, password, strlen(password));
+  filewrite(f, "\n", sizeof("\n"));
+
+  myproc()->ofile[fd] = 0;
+  fileclose(f);
+
+  end_op();
+  return 0;
+}
+
+int
+sys_deleteUser(void)
+{
+  char *username, filestr[500];
+  int fd, i, j, tempi, deleteflag = 0;
+  struct file *f;
+  char temp[USERMAXCHAR] = {};
+
+  if(argptr(0, &username, 50))
+    return -1;
+
+  if(!strncmp(username, "root", max(strlen(username), strlen("root"))))
+    return -1;
+
+  begin_op();
+
+  fd = openfile("users", O_RDONLY);
+  f = getfile(fd);
+  fileread(f, filestr, 500);
+  myproc()->ofile[fd] = 0;
+  fileclose(f);
+  
+  fd = openfile("users", O_WRONLY);
+  f = getfile(fd);
+
+  for(i = 0, tempi = 0; i < strlen(filestr); i++, tempi++) {
+    if(filestr[i] == ' ') {
+      if(!strncmp(temp, username, max(strlen(temp), strlen(username)))) {
+        deleteflag = -1;
+      } else {
+        filewrite(f, temp, strlen(temp));
+        filewrite(f, " ", 1);
+      }
+      tempi = -1;
+      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+    }
+    else if(filestr[i] == '\n') {
+      if(deleteflag == -1) {
+        deleteflag = 1;
+      } else {
+        filewrite(f, temp, strlen(temp));
+        filewrite(f, "\n", 1);
+      }
+      tempi = -1;
+      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+    }
+    else {
+      temp[tempi] = filestr[i];
+    }
+  }
+  filewrite(f, "\0", 1);
+  
+  myproc()->ofile[fd] = 0;
+  fileclose(f);
+  
+  end_op();
+
+  if (deleteflag) return -1;
+  return 0;
 }
 
 int
@@ -280,6 +437,51 @@ create(char *path, short type, short major, short minor)
   iunlockput(dp);
 
   return ip;
+}
+
+int
+openfile(char *path, int omode)
+{ 
+  int fd;
+  struct file *f;
+  struct inode *ip;
+  begin_op();
+
+  if(omode & O_CREATE){
+    ip = create(path, T_FILE, 0, 0);
+    if(ip == 0){
+      end_op();
+      return -1;
+    }
+  } else {
+    if((ip = namei(path)) == 0){
+      end_op();
+      return -1;
+    }
+    ilock(ip);
+    if(ip->type == T_DIR && omode != O_RDONLY){
+      iunlockput(ip);
+      end_op();
+      return -1;
+    }
+  }
+
+  if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
+    if(f)
+      fileclose(f);
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  iunlock(ip);
+  end_op();
+
+  f->type = FD_INODE;
+  f->ip = ip;
+  f->off = 0;
+  f->readable = !(omode & O_WRONLY);
+  f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  return fd;
 }
 
 int

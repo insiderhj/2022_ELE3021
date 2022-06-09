@@ -26,6 +26,42 @@ static void itrunc(struct inode*);
 // there should be one superblock per disk device, but we run with
 // only one device
 struct superblock sb; 
+struct xv6user usr;
+int usercount;
+
+int
+max(int a, int b)
+{
+  return a > b ? a : b;
+}
+
+int
+login(char* users, char *username, char *password)
+{
+  int i, j, tempi;
+  int checkid = 0;
+  char temp[USERMAXCHAR] = {};
+
+  for(i = 0, tempi = 0; i < strlen(users); i++, tempi++) {
+    if(users[i] == ' ') {
+      if(!strncmp(temp, username, max(strlen(temp), strlen(username))))
+        checkid = 1;
+      tempi = -1;
+      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+    }
+    else if(users[i] == '\n') {
+      if(checkid && !strncmp(temp, password, max(strlen(temp), strlen(password))))
+        return 0;
+      tempi = -1;
+      checkid = 0;
+      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+    }
+    else {
+      temp[tempi] = users[i];
+    }
+  }
+  return -1;
+}
 
 // Read the super block.
 void

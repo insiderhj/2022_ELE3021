@@ -1,3 +1,8 @@
+#define O_RDONLY  0x000
+#define O_WRONLY  0x001
+#define O_RDWR    0x002
+#define O_CREATE  0x200
+
 struct stat;
 struct rtcdate;
 
@@ -31,6 +36,9 @@ int setpriority(int, int);
 int thread_create(thread_t*, void*, void*);
 void thread_exit(void*);
 int thread_join(thread_t, void**);
+int login(char*, char*, char*);
+int addUser(char*, char*);
+int deleteUser(char*);
 
 // ulib.c
 int stat(const char*, struct stat*);

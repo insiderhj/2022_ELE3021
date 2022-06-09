@@ -5,18 +5,36 @@
 int
 main(int argc, char* argv[])
 {
-  printf(1, "My pid is %d\n", getpid());
-  printf(1, "My ppid is %d\n", getppid());
-  
-  int pid = fork();
-  if(pid == 0) {
-	  for(int i = 0; i < 500; i++)
-	  printf(1, "Child\n");
-	  exit();
-  }
-  setpriority(pid, 2);
-  for(int i = 0; i < 1000; i++) printf(1, "Parent\n");
+  char filestr[500];
+  int fd;
 
-  wait();
+  addUser("test1", "1234");
+
+  fd = open("users", O_RDONLY);
+  read(fd, filestr, 500);
+  printf(1, "after adduser: %s\n", filestr);
+  close(fd);
+
+  addUser("test2", "1234");
+
+  fd = open("users", O_RDONLY);
+  read(fd, filestr, 500);
+  printf(1, "after adduser: %s\n", filestr);
+  close(fd);
+
+  addUser("test3", "1234");
+
+  fd = open("users", O_RDONLY);
+  read(fd, filestr, 500);
+  printf(1, "after adduser: %s\n", filestr);
+  close(fd);
+
+  deleteUser("test2");
+
+  fd = open("users", O_RDONLY);
+  read(fd, filestr, 500);
+  printf(1, "after deleteuser: %s\n", filestr);
+  close(fd);
+
   exit();
 }

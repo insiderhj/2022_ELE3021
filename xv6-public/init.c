@@ -27,7 +27,7 @@ main(void)
       exit();
     }
     if(pid == 0){
-      exec("sh", argv);
+      exec("login", argv);
       printf(1, "init: exec sh failed\n");
       exit();
     }
