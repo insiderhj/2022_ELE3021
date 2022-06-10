@@ -4,6 +4,8 @@
 
 struct stat {
   short type;  // Type of file
+  char mode[10];
+  char owner[16];
   int dev;     // File system's disk device
   uint ino;    // Inode number
   short nlink; // Number of links to file

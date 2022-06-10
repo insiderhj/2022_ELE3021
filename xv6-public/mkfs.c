@@ -73,7 +73,6 @@ main(int argc, char *argv[])
   char buf[BSIZE];
   struct dinode din;
 
-
   static_assert(sizeof(int) == 4, "Integers must be 4 bytes!");
 
   if(argc < 2){
@@ -230,6 +229,15 @@ ialloc(ushort type)
   din.type = xshort(type);
   din.nlink = xshort(1);
   din.size = xint(0);
+
+  //루트
+  din.owner[0] = 'r';
+  din.owner[1] = 'o';
+  din.owner[2] = 'o';
+  din.owner[3] = 't';
+
+  din.mode = xint(MODE_RUSR | MODE_WUSR | MODE_XUSR | MODE_ROTH | MODE_XOTH);
+
   winode(inum, &din);
   return inum;
 }

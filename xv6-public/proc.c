@@ -449,6 +449,13 @@ fork(void)
   return pid;
 }
 
+int
+isinitproc(struct proc *proc)
+{
+  if(proc == initproc) return 1;
+  return 0;
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -713,7 +720,6 @@ scheduler(void)
   for(;;){
 
     sti();
-
 
     acquire(&ptable.lock); 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){

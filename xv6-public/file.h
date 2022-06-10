@@ -1,5 +1,5 @@
-#define USERMAXCHAR 16
-#define MAXUSERS     10
+#define USERNAMELEN 16
+#define MAXUSERS    10
 
 struct file {
   enum { FD_NONE, FD_PIPE, FD_INODE } type;
@@ -27,12 +27,8 @@ struct inode {
   uint size;
   uint addrs[NDIRECT+1];
 
+  char owner[16];
   int mode;
-};
-
-struct xv6user {
-  char username[USERMAXCHAR];
-  char password[USERMAXCHAR];
 };
 
 // table mapping major device number to

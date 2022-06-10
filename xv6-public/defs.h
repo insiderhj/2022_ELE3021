@@ -35,12 +35,12 @@ int             filestat(struct file*, struct stat*);
 int             filewrite(struct file*, char*, int n);
 
 // fs.c
-extern struct xv6user usr;
+extern char     user[16];
 int             max(int, int);
 int             login(char*, char*, char*);
+int             chmod(char*, int);
 int             adduser(char*, char*);
 int             deleteuser(char*);
-void            logout(void);
 void            readsb(int dev, struct superblock *sb);
 int             dirlink(struct inode*, char*, uint);
 struct inode*   dirlookup(struct inode*, char*, uint*);
@@ -53,6 +53,7 @@ void            iunlock(struct inode*);
 void            iunlockput(struct inode*);
 void            iupdate(struct inode*);
 int             namecmp(const char*, const char*);
+int             checkmode(struct inode*, int, int);
 struct inode*   namei(char*);
 struct inode*   nameiparent(char*, char*);
 int             readi(struct inode*, char*, uint, uint);
@@ -135,6 +136,7 @@ void            yield(void);
 struct thread*  thread_create(thread_t*, void*, void*);
 void            thread_exit(void*);
 int             thread_join(thread_t, void**);
+int             isinitproc(struct proc*);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

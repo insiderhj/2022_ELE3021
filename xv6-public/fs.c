@@ -26,8 +26,8 @@ static void itrunc(struct inode*);
 // there should be one superblock per disk device, but we run with
 // only one device
 struct superblock sb; 
-struct xv6user usr;
-int usercount;
+char user[USERNAMELEN] = "root";
+int isroot = 1;
 
 int
 max(int a, int b)
@@ -40,27 +40,45 @@ login(char* users, char *username, char *password)
 {
   int i, j, tempi;
   int checkid = 0;
-  char temp[USERMAXCHAR] = {};
+  char temp[USERNAMELEN] = {};
 
   for(i = 0, tempi = 0; i < strlen(users); i++, tempi++) {
     if(users[i] == ' ') {
       if(!strncmp(temp, username, max(strlen(temp), strlen(username))))
         checkid = 1;
       tempi = -1;
-      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+      for(j = 0; j < USERNAMELEN; j++) temp[j] = '\0';
     }
     else if(users[i] == '\n') {
-      if(checkid && !strncmp(temp, password, max(strlen(temp), strlen(password))))
+      if(checkid && !strncmp(temp, password, max(strlen(temp), strlen(password)))) {
+        strncpy(user, username, strlen(username));
+        if(!strncmp(user, "root", max(strlen(user), strlen("root"))))
+          isroot = 1;
+        else
+          isroot = 0;
         return 0;
+      }
       tempi = -1;
       checkid = 0;
-      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+      for(j = 0; j < USERNAMELEN; j++) temp[j] = '\0';
     }
     else {
       temp[tempi] = users[i];
     }
   }
   return -1;
+}
+
+int
+chmod(char* path, int mode)
+{
+  struct inode *ip = namei(path);
+  if(ip == 0) return -1;
+
+  ilock(ip);
+  ip->mode = mode;
+  iunlock(ip);
+  return 0;
 }
 
 // Read the super block.
@@ -266,6 +284,8 @@ iupdate(struct inode *ip)
   dip->minor = ip->minor;
   dip->nlink = ip->nlink;
   dip->size = ip->size;
+  memmove(dip->owner, ip->owner, sizeof(ip->owner));
+  dip->mode = ip->mode;
   memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
   log_write(bp);
   brelse(bp);
@@ -339,6 +359,8 @@ ilock(struct inode *ip)
     ip->minor = dip->minor;
     ip->nlink = dip->nlink;
     ip->size = dip->size;
+    memmove(ip->owner, dip->owner, sizeof(dip->owner));
+    ip->mode = dip->mode;
     memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
     brelse(bp);
     ip->valid = 1;
@@ -476,6 +498,17 @@ void
 stati(struct inode *ip, struct stat *st)
 {
   st->dev = ip->dev;
+
+  if(ip->type == T_DIR)     st->mode[0] = 'd';  else st->mode[0] = '-';
+  if(ip->mode & MODE_RUSR)  st->mode[1] = 'r';  else st->mode[1] = '-';
+  if(ip->mode & MODE_WUSR)  st->mode[2] = 'w';  else st->mode[2] = '-';
+  if(ip->mode & MODE_XUSR)  st->mode[3] = 'x';  else st->mode[3] = '-';
+  if(ip->mode & MODE_ROTH)  st->mode[4] = 'r';  else st->mode[4] = '-';
+  if(ip->mode & MODE_WOTH)  st->mode[5] = 'w';  else st->mode[5] = '-';
+  if(ip->mode & MODE_XOTH)  st->mode[6] = 'x';  else st->mode[6] = '-';
+  st->mode[7] = '\0';
+  strncpy(st->owner, ip->owner, strlen(ip->owner));
+
   st->ino = ip->inum;
   st->type = ip->type;
   st->nlink = ip->nlink;
@@ -653,6 +686,15 @@ skipelem(char *path, char *name)
   return path;
 }
 
+int
+checkmode(struct inode *ip, int ownermode, int othermode)
+{
+  if(ip->type == T_DEV) return 1;
+  if(isroot || !strncmp(user, ip->owner, max(strlen(user), strlen(ip->owner))))
+    return ip->mode & ownermode;
+  return ip->mode & othermode;
+}
+
 // Look up and return the inode for a path name.
 // If parent != 0, return the inode for the parent and copy the final
 // path element into name, which must have room for DIRSIZ bytes.
@@ -669,7 +711,7 @@ namex(char *path, int nameiparent, char *name)
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
-    if(ip->type != T_DIR){
+    if(ip->type != T_DIR || !checkmode(ip, MODE_XUSR, MODE_XOTH)){
       iunlockput(ip);
       return 0;
     }

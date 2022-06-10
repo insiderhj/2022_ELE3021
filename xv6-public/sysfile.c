@@ -18,7 +18,7 @@
 
 
 int openfile(char*, int);
-static struct inode* create(char*, short, short, short);
+static struct inode* create(char*, short, short, short, int, char*);
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -87,7 +87,7 @@ sys_addUser(void)
   int fd, i, j, tempi, usercount = 0;
   struct file *f;
   char filestr[500];
-  char temp[USERMAXCHAR] = {};
+  char temp[USERNAMELEN] = {};
   struct inode *ip;
 
   if(argptr(0, &username, 50) || argptr(1, &password, 50))
@@ -111,11 +111,11 @@ sys_addUser(void)
       }
       usercount++;
       tempi = -1;
-      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+      for(j = 0; j < USERNAMELEN; j++) temp[j] = '\0';
     }
     else if(filestr[i] == '\n') {
       tempi = -1;
-      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+      for(j = 0; j < USERNAMELEN; j++) temp[j] = '\0';
     }
     else {
       temp[tempi] = filestr[i];
@@ -126,7 +126,7 @@ sys_addUser(void)
     return -1;
   }
 
-  if((ip = create(username, T_DIR, 0, 0)) == 0){
+  if((ip = create(username, T_DIR, 0, 0, MODE_RUSR | MODE_WUSR | MODE_XUSR | MODE_ROTH | MODE_XOTH, username)) == 0){
     end_op();
     return -1;
   }
@@ -154,7 +154,7 @@ sys_deleteUser(void)
   char *username, filestr[500];
   int fd, i, j, tempi, deleteflag = 0;
   struct file *f;
-  char temp[USERMAXCHAR] = {};
+  char temp[USERNAMELEN] = {};
 
   if(argptr(0, &username, 50))
     return -1;
@@ -182,7 +182,7 @@ sys_deleteUser(void)
         filewrite(f, " ", 1);
       }
       tempi = -1;
-      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+      for(j = 0; j < USERNAMELEN; j++) temp[j] = '\0';
     }
     else if(filestr[i] == '\n') {
       if(deleteflag == -1) {
@@ -192,7 +192,7 @@ sys_deleteUser(void)
         filewrite(f, "\n", 1);
       }
       tempi = -1;
-      for(j = 0; j < USERMAXCHAR; j++) temp[j] = '\0';
+      for(j = 0; j < USERNAMELEN; j++) temp[j] = '\0';
     }
     else {
       temp[tempi] = filestr[i];
@@ -207,6 +207,22 @@ sys_deleteUser(void)
 
   if (deleteflag) return -1;
   return 0;
+}
+
+int
+sys_chmod(void)
+{
+  char* pathname;
+  int mode, res;
+  
+  if(argptr(0, &pathname, 500) || argint(1, &mode))
+    return -1;
+
+  begin_op();
+  res = chmod(pathname, mode);
+  end_op();
+
+  return res;
 }
 
 int
@@ -232,6 +248,7 @@ sys_read(void)
 
   if(argfd(0, 0, &f) < 0 || argint(2, &n) < 0 || argptr(1, &p, n) < 0)
     return -1;
+    
   return fileread(f, p, n);
 }
 
@@ -356,6 +373,8 @@ sys_unlink(void)
   }
 
   ilock(dp);
+  if(!checkmode(dp, MODE_WUSR, MODE_WOTH))
+    goto bad;
 
   // Cannot unlink "." or "..".
   if(namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
@@ -396,7 +415,7 @@ bad:
 }
 
 static struct inode*
-create(char *path, short type, short major, short minor)
+create(char *path, short type, short major, short minor, int mode, char* owner)
 {
   struct inode *ip, *dp;
   char name[DIRSIZ];
@@ -408,9 +427,14 @@ create(char *path, short type, short major, short minor)
   if((ip = dirlookup(dp, name, 0)) != 0){
     iunlockput(dp);
     ilock(ip);
-    if(type == T_FILE && ip->type == T_FILE)
+    if(type == T_FILE && ip->type == T_FILE && checkmode(ip, MODE_WUSR, MODE_WOTH))
       return ip;
     iunlockput(ip);
+    return 0;
+  }
+
+  if(!checkmode(dp, MODE_WUSR, MODE_WOTH)) {
+    iunlockput(dp);
     return 0;
   }
 
@@ -421,6 +445,8 @@ create(char *path, short type, short major, short minor)
   ip->major = major;
   ip->minor = minor;
   ip->nlink = 1;
+  ip->mode = mode;
+  strncpy(ip->owner, owner, strlen(owner));
   iupdate(ip);
 
   if(type == T_DIR){  // Create . and .. entries.
@@ -448,7 +474,7 @@ openfile(char *path, int omode)
   begin_op();
 
   if(omode & O_CREATE){
-    ip = create(path, T_FILE, 0, 0);
+    ip = create(path, T_FILE, 0, 0, MODE_RUSR | MODE_WUSR | MODE_ROTH, user);
     if(ip == 0){
       end_op();
       return -1;
@@ -498,7 +524,7 @@ sys_open(void)
   begin_op();
 
   if(omode & O_CREATE){
-    ip = create(path, T_FILE, 0, 0);
+    ip = create(path, T_FILE, 0, 0, MODE_RUSR | MODE_WUSR | MODE_ROTH, user);
     if(ip == 0){
       end_op();
       return -1;
@@ -509,7 +535,9 @@ sys_open(void)
       return -1;
     }
     ilock(ip);
-    if(ip->type == T_DIR && omode != O_RDONLY){
+    if((ip->type == T_DIR && omode != O_RDONLY)
+      || ((omode == O_RDONLY || omode == O_RDWR) && !checkmode(ip, MODE_RUSR, MODE_ROTH))
+      || ((omode == O_WRONLY || omode == O_RDWR) && !checkmode(ip, MODE_WUSR, MODE_WOTH))) {
       iunlockput(ip);
       end_op();
       return -1;
@@ -541,7 +569,7 @@ sys_mkdir(void)
   struct inode *ip;
 
   begin_op();
-  if(argstr(0, &path) < 0 || (ip = create(path, T_DIR, 0, 0)) == 0){
+  if(argstr(0, &path) < 0 || (ip = create(path, T_DIR, 0, 0, MODE_RUSR | MODE_WUSR | MODE_XUSR | MODE_ROTH | MODE_XOTH, user)) == 0){
     end_op();
     return -1;
   }
@@ -561,7 +589,7 @@ sys_mknod(void)
   if((argstr(0, &path)) < 0 ||
      argint(1, &major) < 0 ||
      argint(2, &minor) < 0 ||
-     (ip = create(path, T_DEV, major, minor)) == 0){
+     (ip = create(path, T_DEV, major, minor, 63, user)) == 0){
     end_op();
     return -1;
   }
@@ -583,7 +611,7 @@ sys_chdir(void)
     return -1;
   }
   ilock(ip);
-  if(ip->type != T_DIR){
+  if(ip->type != T_DIR || !checkmode(ip, MODE_XUSR, MODE_XOTH)){
     iunlockput(ip);
     end_op();
     return -1;

@@ -13,3 +13,13 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 #define MAXPID 2147483647 // max pid
+
+#ifndef MODES
+  #define MODES
+  #define MODE_RUSR 32 // owner read
+  #define MODE_WUSR 16 // owner write
+  #define MODE_XUSR 8 // owner execute
+  #define MODE_ROTH 4 // others read
+  #define MODE_WOTH 2 // others write
+  #define MODE_XOTH 1 // others execute
+#endif

@@ -28,6 +28,11 @@ exec(char *path, char **argv)
     return -1;
   }
   ilock(ip);
+  if(!checkmode(ip, MODE_XUSR, MODE_XOTH)) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
   pgdir = 0;
 
   // Check ELF header

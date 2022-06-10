@@ -31,3 +31,4 @@
 #define SYS_login   30
 #define SYS_addUser 31
 #define SYS_deleteUser  32
+#define SYS_chmod   33
