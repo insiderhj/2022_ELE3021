@@ -126,10 +126,7 @@ sys_addUser(void)
     return -1;
   }
 
-  if((ip = create(username, T_DIR, 0, 0, MODE_RUSR | MODE_WUSR | MODE_XUSR | MODE_ROTH | MODE_XOTH, username)) == 0){
-    end_op();
-    return -1;
-  }
+  ip = create(username, T_DIR, 0, 0, MODE_RUSR | MODE_WUSR | MODE_XUSR | MODE_ROTH | MODE_XOTH, username);
   iunlockput(ip);
 
   fd = openfile("users", O_WRONLY);
